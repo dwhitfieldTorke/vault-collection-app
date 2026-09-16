@@ -59,10 +59,16 @@ export async function getItems(ownerId: string, category?: ItemCategory): Promis
 }
 
 export async function getItem(itemId: string): Promise<Item | null> {
-  const snap = await getDoc(doc(db, COLLECTION, itemId));
-  if (!snap.exists()) return null;
-  const data = snap.data();
-  return isValidItem(data) ? normalize(data) : null;
+  try {
+    const snap = await getDoc(doc(db, COLLECTION, itemId));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return isValidItem(data) ? normalize(data) : null;
+  } catch {
+    // Firestore rules reject reads for items you don't own — treat that
+    // the same as "not found" rather than surfacing a permission error.
+    return null;
+  }
 }
 
 export function newItemId(): string {
