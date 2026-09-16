@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { getItem } from "@/lib/items";
-import { Item, ItemFormData } from "@/types";
+import { Item, toFormData } from "@/types";
 import ItemForm from "@/components/items/ItemForm";
 
 export default function EditItemPage({ params }: PageProps<"/items/[itemId]/edit">) {
@@ -21,36 +21,25 @@ export default function EditItemPage({ params }: PageProps<"/items/[itemId]/edit
   }, [itemId]);
 
   if (loading) {
-    return <div className="text-gray-500 text-sm py-12 text-center">Loading item...</div>;
+    return <p className="text-ink-faint text-sm text-center py-12">Loading...</p>;
   }
 
   if (!item || !user) {
     return (
-      <div className="text-gray-500 text-sm py-12 text-center">
+      <p className="text-ink-faint text-sm text-center py-12">
         Item not found.{" "}
-        <Link href="/items" className="text-amber-400 hover:text-amber-300">
-          Back to items
+        <Link href="/" className="text-accent hover:text-accent-hover">
+          Back to shelf
         </Link>
-      </div>
+      </p>
     );
   }
 
-  const formData = {
-    category: item.category,
-    name: item.name,
-    photoUrls: item.photoUrls,
-    details: item.details,
-    acquiredDate: item.acquiredDate,
-    purchasePrice: item.purchasePrice,
-    currentValue: item.currentValue,
-    notes: item.notes,
-    tags: item.tags,
-    favorite: item.favorite,
-  } as ItemFormData;
+  const formData = toFormData(item);
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-white mb-6">Edit item</h1>
+      <h1 className="text-xl font-display font-semibold text-ink mb-6">Edit item</h1>
       <ItemForm ownerId={user.uid} itemId={item.itemId} initialData={formData} />
     </div>
   );

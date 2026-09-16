@@ -1,6 +1,9 @@
 # The Vault
 
-A personal collection tracker for comics, trading cards, video games, and Legos. Next.js (App Router) + Firebase Auth/Firestore/Storage, deployed on Vercel.
+A personal collection tracker for comics and trading cards, with a per-item market-estimate
+calculator (grade-adjusted from a base price you set — see `src/types/index.ts`'s
+`COMIC_GRADES`/`CARD_GRADES` tables). Mobile-first Next.js (App Router) app with Firebase
+Auth/Firestore/Storage, deployed on Vercel. Design spec: `DESIGN.md`.
 
 ## Stack
 
@@ -54,7 +57,14 @@ Visit [http://localhost:3000](http://localhost:3000) and sign in with the accoun
 
 ## Data model
 
-Every item lives in a single `items` Firestore collection, scoped by `ownerId`. Shared fields (name, photos, value, notes, tags) live at the top level; category-specific fields (issue number, card grade, platform, set number, etc.) live in a `details` object shaped by `category`. See `src/types/index.ts` for the full shape.
+Every item lives in a single `items` Firestore collection, scoped by `ownerId`. Fields: `title`,
+`edition` (issue # / card #), `source` (publisher / set), `year`, `gradeKey` (a key into
+`COMIC_GRADES` or `CARD_GRADES`), `basePrice` (market price at top grade, entered manually),
+`market` (derived: `basePrice × grade multiplier`), `value` (your own valuation, defaults to
+`market`), `note`, and `photoUrl`. See `src/types/index.ts` for the full shape and grade tables.
+
+Market estimates are local arithmetic only — there's no external pricing API. `basePrice` is
+something you enter yourself when adding an item.
 
 ## Project structure
 
@@ -63,17 +73,20 @@ src/
   app/
     login/                  Sign-in page (public)
     (vault)/                Everything else — protected by proxy.ts
-      page.tsx              Dashboard
-      items/                List, filter, add, view, edit items
+      page.tsx              Shelf (home) — segmented Comics/Trading cards tabs, search, grid
+      items/new/             Add item (manual form)
+      items/[itemId]/         Item detail
+      items/[itemId]/edit/    Edit item (same form as Add)
+      value/                  Portfolio totals + biggest value/market gaps
     api/auth/session/       Sets/clears the session cookie after Firebase sign-in
   components/
     AuthProvider.tsx        Client-side auth context, redirects to /login if signed out
-    VaultSidebar.tsx        Category nav
-    items/                  ItemForm, ItemCard, PhotoUploader
+    BottomTabBar.tsx        Fixed bottom nav (Shelf / Add / Value)
+    items/                  ItemForm, ItemCard, PhotoUploader (single cover photo)
   lib/
     firebase.ts             Client SDK (Auth, Firestore, Storage)
     firebase-admin.ts       Admin SDK (session verification only)
     items.ts, photos.ts     Firestore/Storage CRUD
-  types/index.ts            Item + per-category details types
+  types/index.ts            Item shape, grade tables, market-estimate math
   proxy.ts                  Route protection (Next.js 16 renamed middleware → proxy)
 ```

@@ -1,25 +1,37 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { getItems } from "@/lib/items";
-import { Item, CATEGORIES, CATEGORY_LABELS } from "@/types";
+import {
+  Item,
+  CATEGORIES,
+  CATEGORY_LABELS,
+  CATEGORY_TAB_LABELS,
+  CATEGORY_SLUGS,
+  itemTotalValue,
+  itemTotalCost,
+  isRawGrade,
+} from "@/types";
+import ProfileIcon from "@/components/ProfileIcon";
+import Stat from "@/components/Stat";
 
 function formatCurrency(n: number): string {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
-export default function DashboardPage() {
+export default function ShelfPage() {
   const { user } = useAuth();
-  const [items, setItems] = useState<Item[]>([]);
+  const router = useRouter();
+  const [allItems, setAllItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     const data = await getItems(user.uid);
-    setItems(data);
+    setAllItems(data);
     setLoading(false);
   }, [user]);
 
@@ -27,82 +39,107 @@ export default function DashboardPage() {
     load();
   }, [load]);
 
-  if (loading) {
-    return <div className="text-gray-500 text-sm py-12 text-center">Loading your vault...</div>;
+  function handleSelect(value: string) {
+    if (value === "all") {
+      router.push("/browse");
+      return;
+    }
+    router.push(`/${value}`);
   }
 
-  const totalValue = items.reduce((sum, i) => sum + (i.currentValue ?? 0), 0);
-  const favorites = items.filter((i) => i.favorite).length;
-  const recent = [...items].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
+  const collectionTotal = allItems.reduce((sum, i) => sum + itemTotalValue(i), 0);
+
+  const comics = allItems.filter((i) => i.category === "comic");
+  const totalComics = comics.reduce((sum, i) => sum + i.quantity, 0);
+  const comicsCost = comics.reduce((sum, i) => sum + itemTotalCost(i), 0);
+  const comicsValue = comics.reduce((sum, i) => sum + itemTotalValue(i), 0);
+  const comicsGain = comicsValue - comicsCost;
+  const highestValueComic = comics.reduce<Item | null>(
+    (max, i) => (max === null || i.value > max.value ? i : max),
+    null
+  );
+  const gradedComics = comics.filter((i) => !isRawGrade(i.gradeKey)).length;
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-white mb-6">Dashboard</h1>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total items" value={items.length.toString()} />
-        <StatCard label="Estimated value" value={formatCurrency(totalValue)} />
-        <StatCard label="Favorites" value={favorites.toString()} />
-        <StatCard label="Categories" value={CATEGORIES.length.toString()} />
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-xl font-display font-semibold text-ink">Vault</h1>
+        <ProfileIcon email={user?.email ?? null} />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {CATEGORIES.map((c) => {
-          const count = items.filter((i) => i.category === c).length;
-          const value = items
-            .filter((i) => i.category === c)
-            .reduce((sum, i) => sum + (i.currentValue ?? 0), 0);
-          return (
-            <Link
-              key={c}
-              href={`/items?category=${c}`}
-              className="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-amber-500/50 transition-colors"
-            >
-              <p className="text-gray-400 text-sm mb-1">{CATEGORY_LABELS[c]}</p>
-              <p className="text-white text-xl font-bold">{count}</p>
-              {value > 0 && <p className="text-gray-500 text-xs mt-1">{formatCurrency(value)}</p>}
-            </Link>
-          );
-        })}
-      </div>
-
-      <h2 className="text-white font-semibold mb-4">Recently added</h2>
-      {recent.length === 0 ? (
-        <p className="text-gray-500 text-sm">
-          No items yet.{" "}
-          <Link href="/items/new" className="text-amber-400 hover:text-amber-300">
-            Add your first item
-          </Link>
-          .
+      <div className="bg-surface border border-border rounded-xl p-4 mb-6">
+        <p className="text-xs uppercase tracking-wide text-ink-faint mb-1">Collection value</p>
+        <p className="text-2xl font-display font-semibold text-ink mb-3">
+          {loading ? "…" : formatCurrency(collectionTotal)}
         </p>
-      ) : (
-        <div className="space-y-2">
-          {recent.map((item) => (
-            <Link
-              key={item.itemId}
-              href={`/items/${item.itemId}`}
-              className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 hover:border-gray-700 transition-colors"
-            >
-              <div>
-                <p className="text-white text-sm font-medium">{item.name}</p>
-                <p className="text-gray-500 text-xs">{CATEGORY_LABELS[item.category]}</p>
+        <div className="border-t border-border pt-3 grid grid-cols-2 gap-3">
+          {CATEGORIES.map((c) => {
+            const count = allItems
+              .filter((i) => i.category === c)
+              .reduce((sum, i) => sum + i.quantity, 0);
+            return (
+              <div key={c}>
+                <p className="text-xs text-ink-faint">{CATEGORY_LABELS[c]}</p>
+                <p className="text-sm text-ink">
+                  {loading ? "…" : `${count} item${count === 1 ? "" : "s"}`}
+                </p>
               </div>
-              {item.currentValue != null && (
-                <p className="text-gray-300 text-sm">{formatCurrency(item.currentValue)}</p>
-              )}
-            </Link>
-          ))}
+            );
+          })}
         </div>
-      )}
-    </div>
-  );
-}
+      </div>
 
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <p className="text-gray-400 text-sm mb-1">{label}</p>
-      <p className="text-white text-2xl font-bold">{value}</p>
+      {!loading && comics.length > 0 && (
+        <>
+          <h2 className="text-sm font-medium text-ink-muted mb-2">Comics</h2>
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <Stat label="Total comics" value={String(totalComics)} />
+            <Stat label="Total cost" value={formatCurrency(comicsCost)} />
+            <Stat label="Estimated value" value={formatCurrency(comicsValue)} />
+            <Stat
+              label="Potential gain"
+              value={`${comicsGain >= 0 ? "+" : "−"}${formatCurrency(Math.abs(comicsGain))}`}
+              tone={comicsGain >= 0 ? "positive" : "negative"}
+            />
+            <Stat
+              label="Highest value comic"
+              value={highestValueComic ? formatCurrency(highestValueComic.value) : "—"}
+              sublabel={highestValueComic?.title}
+            />
+            <Stat label="Graded comics" value={String(gradedComics)} />
+          </div>
+        </>
+      )}
+
+      <h2 className="text-sm font-medium text-ink-muted mb-2">Browse</h2>
+      <div className="relative">
+        <select
+          defaultValue=""
+          onChange={(e) => handleSelect(e.target.value)}
+          className="w-full appearance-none bg-surface border border-border rounded-lg pl-3.5 pr-9 py-2.5 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+        >
+          <option value="" disabled>
+            Go to a category...
+          </option>
+          {CATEGORIES.map((c) => (
+            <option key={c} value={CATEGORY_SLUGS[c]}>
+              {CATEGORY_TAB_LABELS[c]}
+            </option>
+          ))}
+          <option value="all">All categories (browse)</option>
+        </select>
+        <svg
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
     </div>
   );
 }

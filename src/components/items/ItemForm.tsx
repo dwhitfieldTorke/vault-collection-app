@@ -7,18 +7,13 @@ import {
   ItemCategory,
   CATEGORIES,
   CATEGORY_LABELS,
+  EDITION_LABELS,
+  SOURCE_LABELS,
   emptyFormData,
-  ComicDetails,
-  TradingCardDetails,
-  VideoGameDetails,
-  LegoDetails,
-  VIDEO_GAME_CONDITIONS,
-  VIDEO_GAME_CONDITION_LABELS,
-  LEGO_BOX_CONDITIONS,
-  LEGO_BOX_CONDITION_LABELS,
+  gradesFor,
+  computeMarket,
 } from "@/types";
 import { createItem, updateItem } from "@/lib/items";
-import PhotoUploader from "@/components/items/PhotoUploader";
 
 interface ItemFormProps {
   ownerId: string;
@@ -33,7 +28,6 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
   const [form, setForm] = useState<ItemFormData>(
     initialData ?? emptyFormData(defaultCategory ?? "comic")
   );
-  const [tagsInput, setTagsInput] = useState((initialData?.tags ?? []).join(", "));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -42,11 +36,29 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
   }
 
   function setCategory(category: ItemCategory) {
-    setForm(emptyFormData(category));
+    const gradeKey = gradesFor(category)[0].key;
+    setForm((prev) => ({
+      ...prev,
+      category,
+      gradeKey,
+      market: computeMarket(category, gradeKey, prev.basePrice),
+    }));
   }
 
-  function setDetails(details: ItemFormData["details"]) {
-    setForm((prev) => ({ ...prev, details } as ItemFormData));
+  function setGrade(gradeKey: string) {
+    setForm((prev) => ({
+      ...prev,
+      gradeKey,
+      market: computeMarket(prev.category, gradeKey, prev.basePrice),
+    }));
+  }
+
+  function setBasePrice(basePrice: number) {
+    setForm((prev) => ({
+      ...prev,
+      basePrice,
+      market: computeMarket(prev.category, prev.gradeKey, basePrice),
+    }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -54,17 +66,11 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
     setError("");
     setSaving(true);
 
-    const tags = tagsInput
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-    const data: ItemFormData = { ...form, tags };
-
     try {
       if (isEditing) {
-        await updateItem(itemId, data);
+        await updateItem(itemId, form);
       } else {
-        await createItem(itemId, ownerId, data);
+        await createItem(itemId, ownerId, form);
       }
       router.push(`/items/${itemId}`);
     } catch (err) {
@@ -74,9 +80,16 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
     }
   }
 
+  const grades = gradesFor(form.category);
+  const delta = form.value - form.market;
+  const profit = (form.value - (form.purchasePrice ?? 0)) * form.quantity;
+  const roi = form.purchasePrice
+    ? ((form.value - form.purchasePrice) / form.purchasePrice) * 100
+    : null;
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 max-w-2xl">
-      <Section title="Category">
+    <form onSubmit={handleSubmit} className="space-y-8 max-w-xl">
+      <Section title="Type">
         <div className="flex flex-wrap gap-2">
           {CATEGORIES.map((c) => (
             <Chip
@@ -89,125 +102,212 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
           ))}
         </div>
         {isEditing && (
-          <p className="text-xs text-gray-500 mt-1">Category can&apos;t be changed after an item is created.</p>
+          <p className="text-xs text-ink-faint mt-1">Type can&apos;t be changed after saving.</p>
         )}
       </Section>
 
-      <Section title="Basic info">
-        <Field label="Name">
+      <Section title="Details">
+        <Field label="Title">
           <input
             required
-            value={form.name}
-            onChange={(e) => set("name", e.target.value)}
+            value={form.title}
+            onChange={(e) => set("title", e.target.value)}
             className={input()}
             placeholder="e.g. Amazing Spider-Man #300"
           />
         </Field>
-
-        <Field label="Photos">
-          <PhotoUploader
-            ownerId={ownerId}
-            itemId={itemId}
-            photoUrls={form.photoUrls}
-            onChange={(urls) => set("photoUrls", urls)}
+        <div className="grid grid-cols-2 gap-4">
+          <Field label={EDITION_LABELS[form.category]}>
+            <input
+              value={form.edition}
+              onChange={(e) => set("edition", e.target.value)}
+              className={input()}
+            />
+          </Field>
+          <Field label={SOURCE_LABELS[form.category]}>
+            <input
+              value={form.source}
+              onChange={(e) => set("source", e.target.value)}
+              className={input()}
+            />
+          </Field>
+        </div>
+        <Field label="Variant / edition">
+          <input
+            value={form.variant ?? ""}
+            onChange={(e) => set("variant", e.target.value)}
+            className={input()}
+            placeholder="e.g. 1st print, holo, collector's edition"
           />
         </Field>
-      </Section>
-
-      <Section title={CATEGORY_LABELS[form.category] + " details"}>
-        {form.category === "comic" && (
-          <ComicFields details={form.details} onChange={setDetails} />
-        )}
-        {form.category === "trading_card" && (
-          <TradingCardFields details={form.details} onChange={setDetails} />
-        )}
-        {form.category === "video_game" && (
-          <VideoGameFields details={form.details} onChange={setDetails} />
-        )}
-        {form.category === "lego" && (
-          <LegoFields details={form.details} onChange={setDetails} />
-        )}
-      </Section>
-
-      <Section title="Value & provenance">
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Acquired date">
+        <div className="grid grid-cols-3 gap-4">
+          <Field label="Year">
             <input
-              type="date"
-              value={form.acquiredDate ? new Date(form.acquiredDate).toISOString().slice(0, 10) : ""}
-              onChange={(e) =>
-                set("acquiredDate", e.target.value ? new Date(e.target.value).getTime() : undefined)
-              }
+              type="number"
+              value={form.year ?? ""}
+              onChange={(e) => set("year", e.target.value ? Number(e.target.value) : undefined)}
               className={input()}
             />
           </Field>
-          <div />
-          <Field label="Purchase price (USD)">
+          <Field label="Cover price">
             <input
               type="number"
               min={0}
               step="0.01"
-              value={form.purchasePrice ?? ""}
+              value={form.coverPrice ?? ""}
               onChange={(e) =>
-                set("purchasePrice", e.target.value ? Number(e.target.value) : undefined)
+                set("coverPrice", e.target.value ? Number(e.target.value) : undefined)
               }
               className={input()}
+              placeholder="e.g. 3.99"
             />
           </Field>
-          <Field label="Current value (USD)">
+          <Field label="Quantity">
             <input
               type="number"
-              min={0}
-              step="0.01"
-              value={form.currentValue ?? ""}
-              onChange={(e) =>
-                set("currentValue", e.target.value ? Number(e.target.value) : undefined)
-              }
+              min={1}
+              step="1"
+              value={form.quantity}
+              onChange={(e) => set("quantity", Math.max(1, Number(e.target.value) || 1))}
               className={input()}
             />
           </Field>
         </div>
       </Section>
 
-      <Section title="Notes & tags">
-        <Field label="Notes">
-          <textarea
-            value={form.notes ?? ""}
-            onChange={(e) => set("notes", e.target.value)}
-            rows={3}
-            className={`${input()} resize-none`}
-            placeholder="Condition notes, provenance, anything worth remembering..."
-          />
-        </Field>
-        <Field label="Tags (comma separated)">
-          <input
-            value={tagsInput}
-            onChange={(e) => setTagsInput(e.target.value)}
-            className={input()}
-            placeholder="e.g. graded, holiday-gift, wishlist"
-          />
-        </Field>
-        <Checkbox
-          label="Favorite"
-          checked={form.favorite}
-          onChange={(v) => set("favorite", v)}
-        />
+      <Section title="Condition">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {grades.map((g) => (
+            <button
+              key={g.key}
+              type="button"
+              onClick={() => setGrade(g.key)}
+              className={`text-left rounded-lg border px-3 py-2 transition-colors ${
+                form.gradeKey === g.key
+                  ? "bg-accent-tint border-accent text-ink"
+                  : "border-border text-ink-muted hover:border-accent/50"
+              }`}
+            >
+              <span className="block text-sm font-medium">{g.label}</span>
+              <span className="block text-xs text-ink-faint">{g.note}</span>
+            </button>
+          ))}
+        </div>
       </Section>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      <Section title="Value">
+        <Field label="Base market price (at top grade)">
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={form.basePrice || ""}
+            onChange={(e) => setBasePrice(e.target.value ? Number(e.target.value) : 0)}
+            className={input()}
+          />
+        </Field>
+
+        <div className="bg-surface border border-border rounded-lg p-4">
+          <p className="text-xs uppercase tracking-wide text-ink-faint mb-1">Market estimate</p>
+          <p className="text-xl font-semibold font-display text-ink">
+            {formatCurrency(form.market)}
+          </p>
+        </div>
+
+        <div className="flex items-end gap-3">
+          <Field label="Your value">
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.value || ""}
+              onChange={(e) => set("value", e.target.value ? Number(e.target.value) : 0)}
+              className={input()}
+            />
+          </Field>
+          <button
+            type="button"
+            onClick={() => set("value", form.market)}
+            className="mb-0.5 text-sm text-accent hover:text-accent-hover whitespace-nowrap px-3 py-2.5"
+          >
+            Match est.
+          </button>
+        </div>
+        {form.basePrice > 0 && (
+          <p className="text-xs text-ink-faint">
+            {delta === 0
+              ? "At the market estimate."
+              : `${delta > 0 ? "+" : ""}${formatCurrency(delta)} vs. estimate.`}
+          </p>
+        )}
+
+        <Field label="Purchase price (per item)">
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={form.purchasePrice ?? ""}
+            onChange={(e) =>
+              set("purchasePrice", e.target.value ? Number(e.target.value) : undefined)
+            }
+            className={input()}
+            placeholder="What you paid"
+          />
+        </Field>
+
+        {!!form.purchasePrice && (
+          <div className="bg-surface border border-border rounded-lg p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-ink-faint mb-1">Profit</p>
+              <p
+                className={`text-lg font-semibold font-display ${
+                  profit >= 0 ? "text-ink" : "text-red-600"
+                }`}
+              >
+                {profit >= 0 ? "+" : "−"}
+                {formatCurrency(Math.abs(profit))}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-wide text-ink-faint mb-1">ROI</p>
+              <p
+                className={`text-lg font-semibold font-display ${
+                  (roi ?? 0) >= 0 ? "text-ink" : "text-red-600"
+                }`}
+              >
+                {roi != null ? `${roi >= 0 ? "+" : ""}${roi.toFixed(0)}%` : "—"}
+              </p>
+            </div>
+          </div>
+        )}
+      </Section>
+
+      <Section title="Notes">
+        <Field label="Storage note">
+          <textarea
+            value={form.note ?? ""}
+            onChange={(e) => set("note", e.target.value)}
+            rows={3}
+            className={`${input()} resize-none`}
+            placeholder="Where it lives, provenance, anything worth remembering..."
+          />
+        </Field>
+      </Section>
+
+      {error && <p className="text-red-600 text-sm">{error}</p>}
 
       <div className="flex items-center gap-3 pt-2">
         <button
           type="submit"
           disabled={saving}
-          className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-gray-950 font-semibold rounded-lg px-5 py-2.5 text-sm transition-colors"
+          className="bg-accent hover:bg-accent-hover disabled:opacity-50 text-white font-semibold rounded-full px-5 py-2.5 text-sm transition-colors"
         >
-          {saving ? "Saving..." : isEditing ? "Save changes" : "Add to vault"}
+          {saving ? "Saving..." : isEditing ? "Save changes" : "Add to shelf"}
         </button>
         <button
           type="button"
           onClick={() => router.back()}
-          className="text-gray-400 hover:text-white text-sm px-4 py-2.5 rounded-lg border border-gray-700 hover:border-gray-500 transition-colors"
+          className="text-ink-muted hover:text-ink text-sm px-4 py-2.5 rounded-full border border-border hover:border-ink-faint transition-colors"
         >
           Cancel
         </button>
@@ -216,307 +316,16 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
   );
 }
 
-// ── Category-specific field groups ──────────────────────────────────
-
-function ComicFields({
-  details,
-  onChange,
-}: {
-  details: ComicDetails;
-  onChange: (d: ComicDetails) => void;
-}) {
-  const set = <K extends keyof ComicDetails>(key: K, value: ComicDetails[K]) =>
-    onChange({ ...details, [key]: value });
-
-  return (
-    <>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Series">
-          <input
-            required
-            value={details.series}
-            onChange={(e) => set("series", e.target.value)}
-            className={input()}
-          />
-        </Field>
-        <Field label="Issue number">
-          <input
-            required
-            value={details.issueNumber}
-            onChange={(e) => set("issueNumber", e.target.value)}
-            className={input()}
-          />
-        </Field>
-      </div>
-      <div className="grid grid-cols-3 gap-4">
-        <Field label="Publisher">
-          <input
-            value={details.publisher ?? ""}
-            onChange={(e) => set("publisher", e.target.value)}
-            className={input()}
-          />
-        </Field>
-        <Field label="Year">
-          <input
-            type="number"
-            value={details.year ?? ""}
-            onChange={(e) => set("year", e.target.value ? Number(e.target.value) : undefined)}
-            className={input()}
-          />
-        </Field>
-        <Field label="Variant">
-          <input
-            value={details.variant ?? ""}
-            onChange={(e) => set("variant", e.target.value)}
-            className={input()}
-          />
-        </Field>
-      </div>
-      <Field label="Grade (e.g. CGC 9.8, Raw)">
-        <input
-          value={details.grade ?? ""}
-          onChange={(e) => set("grade", e.target.value)}
-          className={input()}
-        />
-      </Field>
-      <Checkbox
-        label="Key issue"
-        checked={details.keyIssue}
-        onChange={(v) => set("keyIssue", v)}
-      />
-    </>
-  );
+function formatCurrency(n: number): string {
+  return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
-
-function TradingCardFields({
-  details,
-  onChange,
-}: {
-  details: TradingCardDetails;
-  onChange: (d: TradingCardDetails) => void;
-}) {
-  const set = <K extends keyof TradingCardDetails>(key: K, value: TradingCardDetails[K]) =>
-    onChange({ ...details, [key]: value });
-
-  return (
-    <>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Game / category (e.g. Pokémon, MTG, Sports)">
-          <input
-            required
-            value={details.game}
-            onChange={(e) => set("game", e.target.value)}
-            className={input()}
-          />
-        </Field>
-        <Field label="Set name">
-          <input
-            value={details.setName ?? ""}
-            onChange={(e) => set("setName", e.target.value)}
-            className={input()}
-          />
-        </Field>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Card number">
-          <input
-            value={details.cardNumber ?? ""}
-            onChange={(e) => set("cardNumber", e.target.value)}
-            className={input()}
-          />
-        </Field>
-        <Field label="Subject (player/character)">
-          <input
-            value={details.subject ?? ""}
-            onChange={(e) => set("subject", e.target.value)}
-            className={input()}
-          />
-        </Field>
-      </div>
-      <div className="grid grid-cols-3 gap-4">
-        <Field label="Year">
-          <input
-            type="number"
-            value={details.year ?? ""}
-            onChange={(e) => set("year", e.target.value ? Number(e.target.value) : undefined)}
-            className={input()}
-          />
-        </Field>
-        <Field label="Grade (e.g. PSA 10, Raw)">
-          <input
-            value={details.grade ?? ""}
-            onChange={(e) => set("grade", e.target.value)}
-            className={input()}
-          />
-        </Field>
-        <Field label="Rarity">
-          <input
-            value={details.rarity ?? ""}
-            onChange={(e) => set("rarity", e.target.value)}
-            className={input()}
-          />
-        </Field>
-      </div>
-    </>
-  );
-}
-
-function VideoGameFields({
-  details,
-  onChange,
-}: {
-  details: VideoGameDetails;
-  onChange: (d: VideoGameDetails) => void;
-}) {
-  const set = <K extends keyof VideoGameDetails>(key: K, value: VideoGameDetails[K]) =>
-    onChange({ ...details, [key]: value });
-
-  return (
-    <>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Platform">
-          <input
-            required
-            value={details.platform}
-            onChange={(e) => set("platform", e.target.value)}
-            className={input()}
-            placeholder="e.g. SNES, PS5, Switch"
-          />
-        </Field>
-        <Field label="Condition">
-          <select
-            value={details.condition}
-            onChange={(e) => set("condition", e.target.value as VideoGameDetails["condition"])}
-            className={input()}
-          >
-            {VIDEO_GAME_CONDITIONS.map((c) => (
-              <option key={c} value={c}>
-                {VIDEO_GAME_CONDITION_LABELS[c]}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-      <div className="grid grid-cols-3 gap-4">
-        <Field label="Region">
-          <input
-            value={details.region ?? ""}
-            onChange={(e) => set("region", e.target.value)}
-            className={input()}
-          />
-        </Field>
-        <Field label="Genre">
-          <input
-            value={details.genre ?? ""}
-            onChange={(e) => set("genre", e.target.value)}
-            className={input()}
-          />
-        </Field>
-        <Field label="Year">
-          <input
-            type="number"
-            value={details.year ?? ""}
-            onChange={(e) => set("year", e.target.value ? Number(e.target.value) : undefined)}
-            className={input()}
-          />
-        </Field>
-      </div>
-      <Field label="Publisher">
-        <input
-          value={details.publisher ?? ""}
-          onChange={(e) => set("publisher", e.target.value)}
-          className={input()}
-        />
-      </Field>
-    </>
-  );
-}
-
-function LegoFields({
-  details,
-  onChange,
-}: {
-  details: LegoDetails;
-  onChange: (d: LegoDetails) => void;
-}) {
-  const set = <K extends keyof LegoDetails>(key: K, value: LegoDetails[K]) =>
-    onChange({ ...details, [key]: value });
-
-  return (
-    <>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Set number">
-          <input
-            required
-            value={details.setNumber}
-            onChange={(e) => set("setNumber", e.target.value)}
-            className={input()}
-          />
-        </Field>
-        <Field label="Theme">
-          <input
-            value={details.theme ?? ""}
-            onChange={(e) => set("theme", e.target.value)}
-            className={input()}
-            placeholder="e.g. Star Wars, Technic, Icons"
-          />
-        </Field>
-      </div>
-      <div className="grid grid-cols-3 gap-4">
-        <Field label="Box condition">
-          <select
-            value={details.boxCondition}
-            onChange={(e) => set("boxCondition", e.target.value as LegoDetails["boxCondition"])}
-            className={input()}
-          >
-            {LEGO_BOX_CONDITIONS.map((c) => (
-              <option key={c} value={c}>
-                {LEGO_BOX_CONDITION_LABELS[c]}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Piece count">
-          <input
-            type="number"
-            min={0}
-            value={details.pieceCount ?? ""}
-            onChange={(e) =>
-              set("pieceCount", e.target.value ? Number(e.target.value) : undefined)
-            }
-            className={input()}
-          />
-        </Field>
-        <Field label="Minifigs included">
-          <input
-            type="number"
-            min={0}
-            value={details.minifigsIncluded ?? ""}
-            onChange={(e) =>
-              set("minifigsIncluded", e.target.value ? Number(e.target.value) : undefined)
-            }
-            className={input()}
-          />
-        </Field>
-      </div>
-      <Field label="Year">
-        <input
-          type="number"
-          value={details.year ?? ""}
-          onChange={(e) => set("year", e.target.value ? Number(e.target.value) : undefined)}
-          className={input()}
-        />
-      </Field>
-    </>
-  );
-}
-
-// ── Small primitives ──────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h2 className="text-white font-semibold mb-4 pb-2 border-b border-gray-800">{title}</h2>
+      <h2 className="text-ink font-display font-semibold mb-4 pb-2 border-b border-border">
+        {title}
+      </h2>
       <div className="space-y-4">{children}</div>
     </div>
   );
@@ -525,7 +334,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-300 mb-1.5">{label}</label>
+      <label className="block text-xs font-medium uppercase tracking-wide text-ink-faint mb-1.5">
+        {label}
+      </label>
       {children}
     </div>
   );
@@ -547,10 +358,10 @@ function Chip({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
         active
-          ? "bg-amber-500/20 border-amber-500/60 text-amber-400"
-          : "border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white"
+          ? "bg-dark-surface border-dark-surface text-white"
+          : "border-border text-ink-muted hover:border-ink-faint"
       }`}
     >
       {label}
@@ -558,29 +369,5 @@ function Chip({
   );
 }
 
-function Checkbox({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="flex items-center gap-3 cursor-pointer group">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="accent-amber-500 w-4 h-4 shrink-0"
-      />
-      <span className="text-sm font-medium text-gray-200 group-hover:text-white transition-colors">
-        {label}
-      </span>
-    </label>
-  );
-}
-
 const input = () =>
-  "w-full bg-gray-800 border border-gray-700 rounded-lg px-3.5 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent";
+  "w-full bg-surface border border-border rounded-lg px-3.5 py-2.5 text-ink text-sm placeholder-placeholder focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent";

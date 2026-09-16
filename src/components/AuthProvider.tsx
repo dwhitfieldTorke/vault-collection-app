@@ -27,8 +27,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-950">
-        <p className="text-gray-500 text-sm">Loading your vault...</p>
+      <div className="flex min-h-screen items-center justify-center bg-canvas">
+        <p className="text-ink-faint text-sm">Loading your vault...</p>
       </div>
     );
   }

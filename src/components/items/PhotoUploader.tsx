@@ -7,70 +7,71 @@ import { uploadItemPhoto, deleteItemPhoto } from "@/lib/photos";
 interface PhotoUploaderProps {
   ownerId: string;
   itemId: string;
-  photoUrls: string[];
-  onChange: (urls: string[]) => void;
+  photoUrl?: string;
+  onChange: (url: string | undefined) => void;
 }
 
-export default function PhotoUploader({ ownerId, itemId, photoUrls, onChange }: PhotoUploaderProps) {
+export default function PhotoUploader({ ownerId, itemId, photoUrl, onChange }: PhotoUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  async function handleFiles(files: FileList | null) {
-    if (!files || files.length === 0) return;
+  async function handleFile(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
     setError("");
     setUploading(true);
+    const previous = photoUrl;
     try {
-      const uploads = await Promise.all(
-        Array.from(files).map((file) => uploadItemPhoto(ownerId, itemId, file))
-      );
-      onChange([...photoUrls, ...uploads]);
+      const url = await uploadItemPhoto(ownerId, itemId, file);
+      onChange(url);
+      if (previous) await deleteItemPhoto(previous);
     } catch {
-      setError("Failed to upload one or more photos.");
+      setError("Failed to upload photo.");
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
     }
   }
 
-  async function handleRemove(url: string) {
-    onChange(photoUrls.filter((u) => u !== url));
-    await deleteItemPhoto(url);
+  async function handleRemove() {
+    if (!photoUrl) return;
+    const previous = photoUrl;
+    onChange(undefined);
+    await deleteItemPhoto(previous);
   }
 
   return (
     <div>
-      <div className="flex flex-wrap gap-3 mb-3">
-        {photoUrls.map((url) => (
-          <div key={url} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-700">
-            <Image src={url} alt="Item photo" fill sizes="96px" className="object-cover" />
-            <button
-              type="button"
-              onClick={() => handleRemove(url)}
-              className="absolute top-1 right-1 w-5 h-5 rounded bg-gray-950/80 text-gray-300 hover:text-white text-xs flex items-center justify-center"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
+      {photoUrl ? (
+        <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border">
+          <Image src={photoUrl} alt="Cover photo" fill sizes="128px" className="object-cover" />
+          <button
+            type="button"
+            onClick={handleRemove}
+            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-ink/70 text-white text-xs flex items-center justify-center"
+          >
+            ✕
+          </button>
+        </div>
+      ) : (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="w-24 h-24 rounded-lg border border-dashed border-gray-700 hover:border-amber-500/60 text-gray-500 hover:text-amber-400 text-xs flex items-center justify-center transition-colors disabled:opacity-50"
+          className="w-32 h-32 rounded-lg border border-dashed border-border hover:border-accent text-ink-faint hover:text-accent text-xs flex items-center justify-center transition-colors disabled:opacity-50"
         >
-          {uploading ? "Uploading..." : "+ Add photo"}
+          {uploading ? "Uploading..." : "+ Add cover"}
         </button>
-      </div>
+      )}
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
-        multiple
         className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
+        onChange={(e) => handleFile(e.target.files)}
       />
-      {error && <p className="text-red-400 text-xs">{error}</p>}
+      {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
     </div>
   );
 }

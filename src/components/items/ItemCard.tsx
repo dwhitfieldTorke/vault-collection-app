@@ -1,49 +1,72 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Item, CATEGORY_LABELS } from "@/types";
+import { Item, gradeOption } from "@/types";
 
 function formatCurrency(n: number): string {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
-export default function ItemCard({ item }: { item: Item }) {
+function deltaLabel(value: number, market: number): string {
+  const delta = value - market;
+  if (delta === 0) return "at est.";
+  return `${delta > 0 ? "+" : "−"}${formatCurrency(Math.abs(delta))}`;
+}
+
+export default function ItemCard({ item, isNew }: { item: Item; isNew?: boolean }) {
+  const grade = gradeOption(item.category, item.gradeKey);
+
   return (
     <Link
       href={`/items/${item.itemId}`}
-      className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden hover:border-amber-500/50 transition-colors group"
+      className="block bg-surface border border-border rounded-xl overflow-hidden hover:border-accent transition-colors"
     >
-      <div className="aspect-square bg-gray-800 relative">
-        {item.photoUrls[0] ? (
+      <div className="aspect-[3/4] bg-canvas relative">
+        {item.photoUrl ? (
           <Image
-            src={item.photoUrls[0]}
-            alt={item.name}
+            src={item.photoUrl}
+            alt={item.title}
             fill
             sizes="(max-width: 768px) 50vw, 25vw"
             className="object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-600 text-3xl">
-            {item.category === "comic" && "📖"}
-            {item.category === "trading_card" && "🃏"}
-            {item.category === "video_game" && "🎮"}
-            {item.category === "lego" && "🧱"}
+          <div className="w-full h-full flex items-center justify-center text-placeholder text-3xl font-display font-semibold">
+            {initials(item.title)}
           </div>
         )}
-        {item.favorite && (
-          <span className="absolute top-2 right-2 text-amber-400 drop-shadow">★</span>
+        <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wide bg-surface/90 text-ink-muted rounded-full px-2 py-0.5 border border-border">
+          {grade.label}
+        </span>
+        {isNew && (
+          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-accent" aria-label="New" />
+        )}
+        {item.edition && (
+          <span className="absolute bottom-2 left-2 text-sm font-semibold bg-surface/90 text-ink rounded-full px-2.5 py-1 border border-border">
+            {item.edition}
+          </span>
+        )}
+        {item.quantity > 1 && (
+          <span className="absolute bottom-2 right-2 text-xs font-medium bg-surface/90 text-ink-muted rounded-full px-2 py-0.5 border border-border">
+            ×{item.quantity}
+          </span>
         )}
       </div>
       <div className="p-3">
-        <p className="text-white text-sm font-medium truncate group-hover:text-amber-400 transition-colors">
-          {item.name}
-        </p>
+        <p className="text-ink text-sm font-medium truncate">{item.title}</p>
         <div className="flex items-center justify-between mt-1">
-          <span className="text-gray-500 text-xs">{CATEGORY_LABELS[item.category]}</span>
-          {item.currentValue != null && (
-            <span className="text-gray-300 text-xs">{formatCurrency(item.currentValue)}</span>
-          )}
+          <span className="text-ink-muted text-xs">{formatCurrency(item.value)}</span>
+          <span className="text-ink-faint text-xs">{deltaLabel(item.value, item.market)}</span>
         </div>
       </div>
     </Link>
   );
+}
+
+function initials(title: string): string {
+  return title
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
 }

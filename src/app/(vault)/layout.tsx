@@ -1,16 +1,13 @@
-import { Suspense } from "react";
 import { AuthProvider } from "@/components/AuthProvider";
-import VaultSidebar from "@/components/VaultSidebar";
+import BottomTabBar from "@/components/BottomTabBar";
 
 export default function VaultLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <div className="flex min-h-screen bg-gray-950">
-        <Suspense fallback={<div className="w-60 shrink-0 bg-gray-900 border-r border-gray-800" />}>
-          <VaultSidebar />
-        </Suspense>
-        <main className="flex-1 p-8 overflow-auto">{children}</main>
+      <div className="min-h-screen bg-canvas pb-24">
+        <div className="max-w-md mx-auto px-4 pt-6">{children}</div>
       </div>
+      <BottomTabBar />
     </AuthProvider>
   );
 }
