@@ -30,6 +30,13 @@ export const EDITION_LABELS: Record<ItemCategory, string> = {
   lego: "Set number",
 };
 
+export const EDITION_SHORT_LABELS: Record<ItemCategory, string> = {
+  comic: "Issue",
+  trading_card: "Card",
+  video_game: "Platform",
+  lego: "Set",
+};
+
 export const SOURCE_LABELS: Record<ItemCategory, string> = {
   comic: "Publisher",
   trading_card: "Set",
@@ -110,10 +117,6 @@ export function gradeOption(category: ItemCategory, gradeKey: string): GradeOpti
   return grades.find((g) => g.key === gradeKey) ?? grades[0];
 }
 
-export function computeMarket(category: ItemCategory, gradeKey: string, basePrice: number): number {
-  return Math.round(basePrice * gradeOption(category, gradeKey).multiplier);
-}
-
 // Only comics and trading cards go through a third-party grading service —
 // the "what if I graded this?" comparison only makes sense for those two.
 export function isGradable(category: ItemCategory): boolean {
@@ -137,8 +140,11 @@ export interface Item {
   year?: number;
   coverPrice?: number;
   gradeKey: string;
-  basePrice: number;
   market: number;
+  marketLow?: number;
+  marketHigh?: number;
+  marketListingCount?: number;
+  marketCheckedAt?: number;
   quantity: number;
   purchasePrice?: number;
   value: number;
@@ -177,8 +183,11 @@ export function toFormData(item: Item): ItemFormData {
     year: item.year,
     coverPrice: item.coverPrice,
     gradeKey: item.gradeKey,
-    basePrice: item.basePrice,
     market: item.market,
+    marketLow: item.marketLow,
+    marketHigh: item.marketHigh,
+    marketListingCount: item.marketListingCount,
+    marketCheckedAt: item.marketCheckedAt,
     quantity: item.quantity,
     purchasePrice: item.purchasePrice,
     value: item.value,
@@ -187,15 +196,20 @@ export function toFormData(item: Item): ItemFormData {
   };
 }
 
+// Comics default to Ungraded — most comics added here won't have been sent
+// to a grading service.
+export function defaultGradeKey(category: ItemCategory): string {
+  return category === "comic" ? "ungraded" : gradesFor(category)[0].key;
+}
+
 export function emptyFormData(category: ItemCategory): ItemFormData {
-  const gradeKey = gradesFor(category)[0].key;
+  const gradeKey = defaultGradeKey(category);
   return {
     category,
     title: "",
     edition: "",
     source: "",
     gradeKey,
-    basePrice: 0,
     market: 0,
     quantity: 1,
     value: 0,

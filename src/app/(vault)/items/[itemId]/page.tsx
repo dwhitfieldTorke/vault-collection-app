@@ -9,17 +9,24 @@ import { deleteItemPhoto } from "@/lib/photos";
 import {
   Item,
   CATEGORY_LABELS,
-  EDITION_LABELS,
-  SOURCE_LABELS,
+  CATEGORY_SLUGS,
+  EDITION_SHORT_LABELS,
   gradeOption,
-  gradesFor,
-  computeMarket,
-  isGradable,
   toFormData,
 } from "@/types";
 
 function formatCurrency(n: number): string {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+function formatRelativeTime(timestamp: number): string {
+  const minutes = Math.round((Date.now() - timestamp) / (60 * 1000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
 }
 
 export default function ItemDetailPage({ params }: PageProps<"/items/[itemId]">) {
@@ -28,7 +35,6 @@ export default function ItemDetailPage({ params }: PageProps<"/items/[itemId]">)
   const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [gradingCost, setGradingCost] = useState<number | undefined>();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,7 +90,7 @@ export default function ItemDetailPage({ params }: PageProps<"/items/[itemId]">)
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <Link href="/" className="text-sm text-ink-muted hover:text-ink">
+        <Link href={`/${CATEGORY_SLUGS[item.category]}`} className="text-sm text-ink-muted hover:text-ink">
           ← {CATEGORY_LABELS[item.category]}
         </Link>
       </div>
@@ -101,9 +107,13 @@ export default function ItemDetailPage({ params }: PageProps<"/items/[itemId]">)
         </div>
         <div className="min-w-0">
           <h1 className="text-lg font-display font-semibold text-ink">{item.title}</h1>
-          <p className="text-sm text-ink-muted truncate">
-            {[item.edition, item.source].filter(Boolean).join(" · ")}
-          </p>
+          {item.edition && (
+            <p className="text-sm text-ink-muted truncate">
+              {EDITION_SHORT_LABELS[item.category]}: {item.edition}
+            </p>
+          )}
+          {item.source && <p className="text-sm text-ink-muted truncate">{item.source}</p>}
+          <p className="text-sm text-ink-muted truncate">Qty: {item.quantity}</p>
           <span className="inline-block mt-2 text-xs uppercase tracking-wide bg-accent-tint text-ink rounded-full px-2.5 py-1">
             {grade.label}
           </span>
@@ -119,20 +129,38 @@ export default function ItemDetailPage({ params }: PageProps<"/items/[itemId]">)
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs uppercase tracking-wide text-ink-faint">Market est.</p>
+            <p className="text-xs uppercase tracking-wide text-ink-faint">eBay median</p>
             <p className="text-xl font-display font-semibold text-ink">
               {formatCurrency(item.market)}
             </p>
           </div>
         </div>
         <div className="border-t border-border pt-3">
-          <p className="text-sm text-ink-muted mb-3">
-            {delta === 0
-              ? "Your value matches the market estimate."
-              : `You are ${formatCurrency(Math.abs(delta))} ${
-                  delta > 0 ? "over" : "under"
-                } the market estimate of ${formatCurrency(item.market)}.`}
-          </p>
+          {item.marketCheckedAt ? (
+            <>
+              <p className="text-sm text-ink-muted mb-1">
+                {delta === 0
+                  ? "Your value matches the eBay median."
+                  : `You are ${formatCurrency(Math.abs(delta))} ${
+                      delta > 0 ? "over" : "under"
+                    } the eBay median of ${formatCurrency(item.market)}.`}
+              </p>
+              <p className="text-xs text-ink-faint mb-3">
+                Range {formatCurrency(item.marketLow ?? item.market)} –{" "}
+                {formatCurrency(item.marketHigh ?? item.market)} from{" "}
+                {item.marketListingCount ?? 0} listing{item.marketListingCount === 1 ? "" : "s"} ·
+                checked {formatRelativeTime(item.marketCheckedAt)}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-ink-faint mb-3">
+              No eBay estimate yet —{" "}
+              <Link href={`/items/${item.itemId}/edit`} className="text-accent hover:text-accent-hover">
+                check on the Edit page
+              </Link>
+              .
+            </p>
+          )}
           <div className="h-1.5 rounded-full bg-border relative">
             <div
               className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-accent"
@@ -160,90 +188,6 @@ export default function ItemDetailPage({ params }: PageProps<"/items/[itemId]">)
             <p className={`text-lg font-display font-semibold ${(roi ?? 0) >= 0 ? "text-ink" : "text-red-600"}`}>
               {roi != null ? `${roi >= 0 ? "+" : ""}${roi.toFixed(0)}%` : "—"}
             </p>
-          </div>
-        </div>
-      )}
-
-      <dl className="grid grid-cols-2 gap-3 mb-6">
-        <MetaRow label={EDITION_LABELS[item.category]} value={item.edition || "—"} />
-        <MetaRow label={SOURCE_LABELS[item.category]} value={item.source || "—"} />
-        {item.variant && <MetaRow label="Variant" value={item.variant} />}
-        <MetaRow label="Year" value={item.year ? String(item.year) : "—"} />
-        <MetaRow
-          label="Cover price"
-          value={item.coverPrice != null ? formatCurrency(item.coverPrice) : "—"}
-        />
-        <MetaRow label="Condition" value={`${grade.label} · ${grade.note}`} />
-        <MetaRow label="Quantity" value={String(item.quantity)} />
-        <MetaRow
-          label="Purchase price"
-          value={item.purchasePrice != null ? formatCurrency(item.purchasePrice) : "—"}
-        />
-      </dl>
-
-      {isGradable(item.category) && item.basePrice > 0 && (
-        <div className="bg-surface border border-border rounded-xl p-4 mb-6">
-          <h2 className="text-ink font-display font-semibold mb-1">What if I graded this?</h2>
-          <p className="text-xs text-ink-faint mb-3">
-            Estimated value at each grade, based on your base market price of{" "}
-            {formatCurrency(item.basePrice)}.
-          </p>
-
-          <label className="block text-xs font-medium uppercase tracking-wide text-ink-faint mb-1.5">
-            Grading cost
-          </label>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={gradingCost ?? ""}
-            onChange={(e) => setGradingCost(e.target.value ? Number(e.target.value) : undefined)}
-            placeholder="e.g. 25"
-            className="w-full bg-canvas border border-border rounded-lg px-3.5 py-2.5 text-ink text-sm placeholder-placeholder focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-4"
-          />
-
-          <div className="space-y-2">
-            {[...gradesFor(item.category)]
-              .sort((a, b) => a.multiplier - b.multiplier)
-              .map((g) => {
-                const gradeValue = computeMarket(item.category, g.key, item.basePrice);
-                const isCurrent = g.key === item.gradeKey;
-                const netGain =
-                  gradeValue - item.value - (gradingCost ?? 0);
-                const showNetGain = !isCurrent && gradeValue > item.value;
-
-                return (
-                  <div
-                    key={g.key}
-                    className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
-                      isCurrent ? "border-accent bg-accent-tint" : "border-border"
-                    }`}
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-ink">
-                        {g.label}
-                        {isCurrent && (
-                          <span className="ml-2 text-[10px] uppercase tracking-wide text-accent">
-                            Current
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-ink-faint">{g.note}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-display font-semibold text-ink">
-                        {formatCurrency(gradeValue)}
-                      </p>
-                      {showNetGain && (
-                        <p className={`text-xs ${netGain >= 0 ? "text-accent" : "text-red-600"}`}>
-                          {netGain >= 0 ? "+" : "−"}
-                          {formatCurrency(Math.abs(netGain))} net
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
           </div>
         </div>
       )}
@@ -277,15 +221,6 @@ export default function ItemDetailPage({ params }: PageProps<"/items/[itemId]">)
           Delete
         </button>
       </div>
-    </div>
-  );
-}
-
-function MetaRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-[10px] uppercase tracking-wide text-ink-faint">{label}</dt>
-      <dd className="text-sm text-ink">{value}</dd>
     </div>
   );
 }

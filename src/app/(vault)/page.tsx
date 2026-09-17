@@ -67,6 +67,35 @@ export default function ShelfPage() {
         <ProfileIcon email={user?.email ?? null} />
       </div>
 
+      <div className="relative mb-6">
+        <select
+          defaultValue=""
+          onChange={(e) => handleSelect(e.target.value)}
+          className="w-full appearance-none bg-surface border border-border rounded-lg pl-3.5 pr-9 py-2.5 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+        >
+          <option value="" disabled>
+            Go to a category...
+          </option>
+          {CATEGORIES.map((c) => (
+            <option key={c} value={CATEGORY_SLUGS[c]}>
+              {CATEGORY_TAB_LABELS[c]}
+            </option>
+          ))}
+          <option value="all">All categories (browse)</option>
+        </select>
+        <svg
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+
       <div className="bg-surface border border-border rounded-xl p-4 mb-6">
         <p className="text-xs uppercase tracking-wide text-ink-faint mb-1">Collection value</p>
         <p className="text-2xl font-display font-semibold text-ink mb-3">
@@ -110,36 +139,6 @@ export default function ShelfPage() {
           </div>
         </>
       )}
-
-      <h2 className="text-sm font-medium text-ink-muted mb-2">Browse</h2>
-      <div className="relative">
-        <select
-          defaultValue=""
-          onChange={(e) => handleSelect(e.target.value)}
-          className="w-full appearance-none bg-surface border border-border rounded-lg pl-3.5 pr-9 py-2.5 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-        >
-          <option value="" disabled>
-            Go to a category...
-          </option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={CATEGORY_SLUGS[c]}>
-              {CATEGORY_TAB_LABELS[c]}
-            </option>
-          ))}
-          <option value="all">All categories (browse)</option>
-        </select>
-        <svg
-          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </div>
     </div>
   );
 }
