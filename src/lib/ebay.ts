@@ -45,6 +45,17 @@ export interface EbayPriceRange {
   median: number;
   high: number;
   count: number;
+  gradedCount: number;
+  ungradedCount: number;
+}
+
+// Third-party grading services whose name shows up in a listing title when
+// an item has been professionally graded (comics, cards, and video games).
+const GRADING_KEYWORDS = ["CGC", "PSA", "BGS", "SGC", "WATA", "VGA"];
+
+function isGradedTitle(title: string): boolean {
+  const upper = title.toUpperCase();
+  return GRADING_KEYWORDS.some((keyword) => upper.includes(keyword));
 }
 
 export async function searchEbayPriceRange(query: string): Promise<EbayPriceRange | null> {
@@ -66,23 +77,30 @@ export async function searchEbayPriceRange(query: string): Promise<EbayPriceRang
   }
 
   const data = await res.json();
-  const prices: number[] = (data.itemSummaries ?? [])
-    .map((item: { price?: { value?: string; currency?: string } }) =>
-      item.price?.currency === "USD" ? Number(item.price.value) : null
-    )
-    .filter((p: number | null): p is number => p != null && !Number.isNaN(p))
-    .sort((a: number, b: number) => a - b);
+  const items: { price?: { value?: string; currency?: string }; title?: string }[] =
+    data.itemSummaries ?? [];
 
-  if (prices.length === 0) return null;
+  const priced = items
+    .map((item) => ({
+      price: item.price?.currency === "USD" ? Number(item.price.value) : null,
+      graded: isGradedTitle(item.title ?? ""),
+    }))
+    .filter((item): item is { price: number; graded: boolean } => item.price != null && !Number.isNaN(item.price));
 
+  if (priced.length === 0) return null;
+
+  const prices = priced.map((p) => p.price).sort((a, b) => a - b);
   const mid = Math.floor(prices.length / 2);
   const median =
     prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid];
+  const gradedCount = priced.filter((p) => p.graded).length;
 
   return {
     low: prices[0],
     median: Math.round(median),
     high: prices[prices.length - 1],
     count: prices.length,
+    gradedCount,
+    ungradedCount: prices.length - gradedCount,
   };
 }

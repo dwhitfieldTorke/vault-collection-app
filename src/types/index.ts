@@ -144,6 +144,8 @@ export interface Item {
   marketLow?: number;
   marketHigh?: number;
   marketListingCount?: number;
+  marketGradedCount?: number;
+  marketUngradedCount?: number;
   marketCheckedAt?: number;
   quantity: number;
   purchasePrice?: number;
@@ -187,6 +189,8 @@ export function toFormData(item: Item): ItemFormData {
     marketLow: item.marketLow,
     marketHigh: item.marketHigh,
     marketListingCount: item.marketListingCount,
+    marketGradedCount: item.marketGradedCount,
+    marketUngradedCount: item.marketUngradedCount,
     marketCheckedAt: item.marketCheckedAt,
     quantity: item.quantity,
     purchasePrice: item.purchasePrice,

@@ -145,12 +145,17 @@ export default function ItemDetailPage({ params }: PageProps<"/items/[itemId]">)
                       delta > 0 ? "over" : "under"
                     } the eBay median of ${formatCurrency(item.market)}.`}
               </p>
-              <p className="text-xs text-ink-faint mb-3">
+              <p className="text-xs text-ink-faint mb-1">
                 Range {formatCurrency(item.marketLow ?? item.market)} –{" "}
                 {formatCurrency(item.marketHigh ?? item.market)} from{" "}
                 {item.marketListingCount ?? 0} listing{item.marketListingCount === 1 ? "" : "s"} ·
                 checked {formatRelativeTime(item.marketCheckedAt)}
               </p>
+              {(item.marketGradedCount ?? 0) + (item.marketUngradedCount ?? 0) > 0 && (
+                <p className="text-xs text-ink-faint mb-3">
+                  {item.marketGradedCount ?? 0} graded · {item.marketUngradedCount ?? 0} ungraded
+                </p>
+              )}
             </>
           ) : (
             <p className="text-sm text-ink-faint mb-3">

@@ -90,6 +90,8 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
         marketLow: data.low,
         marketHigh: data.high,
         marketListingCount: data.count,
+        marketGradedCount: data.gradedCount,
+        marketUngradedCount: data.ungradedCount,
         marketCheckedAt: Date.now(),
         value: valueTouched ? prev.value : data.median,
       }));
@@ -296,6 +298,11 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
                   {form.marketListingCount === 1 ? "" : "s"} · checked{" "}
                   {formatRelativeTime(form.marketCheckedAt)}
                 </p>
+                {(form.marketGradedCount ?? 0) + (form.marketUngradedCount ?? 0) > 0 && (
+                  <p className="text-xs text-ink-faint mt-0.5">
+                    {form.marketGradedCount ?? 0} graded · {form.marketUngradedCount ?? 0} ungraded
+                  </p>
+                )}
               </div>
             ) : (
               <p className="text-xs text-ink-faint">Not checked yet.</p>
