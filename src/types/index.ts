@@ -146,6 +146,8 @@ export interface Item {
   marketListingCount?: number;
   marketGradedCount?: number;
   marketUngradedCount?: number;
+  marketGradedMedian?: number;
+  marketUngradedMedian?: number;
   marketCheckedAt?: number;
   quantity: number;
   purchasePrice?: number;
@@ -191,6 +193,8 @@ export function toFormData(item: Item): ItemFormData {
     marketListingCount: item.marketListingCount,
     marketGradedCount: item.marketGradedCount,
     marketUngradedCount: item.marketUngradedCount,
+    marketGradedMedian: item.marketGradedMedian,
+    marketUngradedMedian: item.marketUngradedMedian,
     marketCheckedAt: item.marketCheckedAt,
     quantity: item.quantity,
     purchasePrice: item.purchasePrice,

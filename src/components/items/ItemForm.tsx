@@ -92,6 +92,8 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
         marketListingCount: data.count,
         marketGradedCount: data.gradedCount,
         marketUngradedCount: data.ungradedCount,
+        marketGradedMedian: data.gradedMedian ?? undefined,
+        marketUngradedMedian: data.ungradedMedian ?? undefined,
         marketCheckedAt: Date.now(),
         value: valueTouched ? prev.value : data.median,
       }));
@@ -300,7 +302,12 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
                 </p>
                 {(form.marketGradedCount ?? 0) + (form.marketUngradedCount ?? 0) > 0 && (
                   <p className="text-xs text-ink-faint mt-0.5">
-                    {form.marketGradedCount ?? 0} graded · {form.marketUngradedCount ?? 0} ungraded
+                    {form.marketGradedCount ?? 0} graded
+                    {form.marketGradedMedian != null && ` (${formatCurrency(form.marketGradedMedian)} median)`}
+                    {" · "}
+                    {form.marketUngradedCount ?? 0} ungraded
+                    {form.marketUngradedMedian != null &&
+                      ` (${formatCurrency(form.marketUngradedMedian)} median)`}
                   </p>
                 )}
               </div>

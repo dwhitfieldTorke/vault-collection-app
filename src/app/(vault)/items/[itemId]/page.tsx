@@ -153,7 +153,12 @@ export default function ItemDetailPage({ params }: PageProps<"/items/[itemId]">)
               </p>
               {(item.marketGradedCount ?? 0) + (item.marketUngradedCount ?? 0) > 0 && (
                 <p className="text-xs text-ink-faint mb-3">
-                  {item.marketGradedCount ?? 0} graded · {item.marketUngradedCount ?? 0} ungraded
+                  {item.marketGradedCount ?? 0} graded
+                  {item.marketGradedMedian != null && ` (${formatCurrency(item.marketGradedMedian)} median)`}
+                  {" · "}
+                  {item.marketUngradedCount ?? 0} ungraded
+                  {item.marketUngradedMedian != null &&
+                    ` (${formatCurrency(item.marketUngradedMedian)} median)`}
                 </p>
               )}
             </>

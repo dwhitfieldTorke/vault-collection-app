@@ -47,6 +47,8 @@ export interface EbayPriceRange {
   count: number;
   gradedCount: number;
   ungradedCount: number;
+  gradedMedian: number | null;
+  ungradedMedian: number | null;
 }
 
 // Third-party grading services whose name shows up in a listing title when
@@ -56,6 +58,16 @@ const GRADING_KEYWORDS = ["CGC", "PSA", "BGS", "SGC", "WATA", "VGA"];
 function isGradedTitle(title: string): boolean {
   const upper = title.toUpperCase();
   return GRADING_KEYWORDS.some((keyword) => upper.includes(keyword));
+}
+
+function median(sortedPrices: number[]): number | null {
+  if (sortedPrices.length === 0) return null;
+  const mid = Math.floor(sortedPrices.length / 2);
+  const value =
+    sortedPrices.length % 2 === 0
+      ? (sortedPrices[mid - 1] + sortedPrices[mid]) / 2
+      : sortedPrices[mid];
+  return Math.round(value);
 }
 
 export async function searchEbayPriceRange(query: string): Promise<EbayPriceRange | null> {
@@ -90,17 +102,17 @@ export async function searchEbayPriceRange(query: string): Promise<EbayPriceRang
   if (priced.length === 0) return null;
 
   const prices = priced.map((p) => p.price).sort((a, b) => a - b);
-  const mid = Math.floor(prices.length / 2);
-  const median =
-    prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid];
-  const gradedCount = priced.filter((p) => p.graded).length;
+  const gradedPrices = priced.filter((p) => p.graded).map((p) => p.price).sort((a, b) => a - b);
+  const ungradedPrices = priced.filter((p) => !p.graded).map((p) => p.price).sort((a, b) => a - b);
 
   return {
     low: prices[0],
-    median: Math.round(median),
+    median: median(prices) as number,
     high: prices[prices.length - 1],
     count: prices.length,
-    gradedCount,
-    ungradedCount: prices.length - gradedCount,
+    gradedCount: gradedPrices.length,
+    ungradedCount: ungradedPrices.length,
+    gradedMedian: median(gradedPrices),
+    ungradedMedian: median(ungradedPrices),
   };
 }
