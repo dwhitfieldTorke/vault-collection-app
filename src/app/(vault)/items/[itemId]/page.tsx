@@ -113,10 +113,52 @@ export default function ItemDetailPage({ params }: PageProps<"/items/[itemId]">)
             </p>
           )}
           {item.source && <p className="text-sm text-ink-muted truncate">{item.source}</p>}
+          {item.serialNumber && (
+            <p className="text-sm text-ink-muted truncate">#{item.serialNumber}</p>
+          )}
+          {item.rarity && <p className="text-sm text-ink-muted truncate">{item.rarity}</p>}
+          {item.minifigCount != null && (
+            <p className="text-sm text-ink-muted truncate">
+              {item.minifigCount} minifig{item.minifigCount === 1 ? "" : "s"}
+            </p>
+          )}
+          {item.region && <p className="text-sm text-ink-muted truncate">{item.region}</p>}
           <p className="text-sm text-ink-muted truncate">Qty: {item.quantity}</p>
-          <span className="inline-block mt-2 text-xs uppercase tracking-wide bg-accent-tint text-ink rounded-full px-2.5 py-1">
-            {grade.label}
-          </span>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <span className="inline-block text-xs uppercase tracking-wide bg-accent-tint text-ink rounded-full px-2.5 py-1">
+              {grade.label}
+            </span>
+            {item.isPromo && (
+              <span className="inline-block text-xs uppercase tracking-wide bg-accent-tint text-ink rounded-full px-2.5 py-1">
+                Promo
+              </span>
+            )}
+            {item.isError && (
+              <span className="inline-block text-xs uppercase tracking-wide bg-accent-tint text-ink rounded-full px-2.5 py-1">
+                Error
+              </span>
+            )}
+            {item.hasInstructions && (
+              <span className="inline-block text-xs uppercase tracking-wide bg-accent-tint text-ink rounded-full px-2.5 py-1">
+                Instructions
+              </span>
+            )}
+            {item.isRetired && (
+              <span className="inline-block text-xs uppercase tracking-wide bg-accent-tint text-ink rounded-full px-2.5 py-1">
+                Retired / EOL
+              </span>
+            )}
+            {item.isReprint && (
+              <span className="inline-block text-xs uppercase tracking-wide bg-accent-tint text-ink rounded-full px-2.5 py-1">
+                Reprint
+              </span>
+            )}
+            {item.isNotForResale && (
+              <span className="inline-block text-xs uppercase tracking-wide bg-accent-tint text-ink rounded-full px-2.5 py-1">
+                Not for Resale
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

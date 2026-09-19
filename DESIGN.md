@@ -2,12 +2,15 @@
 
 Interactive prototype, iPhone. Scan a comic book or trading card and it lands on your shelf with a market estimate next to your own number.
 
-> **Implementation note:** the real app (this repo) implements the visual system, screens, data
-> model, and grade-based market-estimate calculator below, but the "Scan flow" section's camera
-> capture and simulated AI-match/confidence step were dropped in favor of plain manual entry —
-> no camera, no fake matching delay. The base market price used to compute the grade-adjusted
-> estimate is something you type in yourself when adding an item, not pulled from a real pricing
-> API. Everything else (Shelf, Item Detail, grade tables, palette) matches this spec.
+> **Implementation note:** the real app (this repo) implements the screens, data model, and
+> grade-based market-estimate calculator below, but the "Scan flow" section's camera capture and
+> simulated AI-match/confidence step were dropped in favor of plain manual entry — no camera, no
+> fake matching delay. Market estimates are now sourced from a real eBay Browse API lookup rather
+> than the base-price-times-grade-multiplier math described here. The **Visual system** section's
+> palette has since been updated to target the Relate design system (see below) and has **not yet
+> been applied to the live app's CSS** — the app is currently still running the original warm
+> parchment/blue palette this doc used to describe. Screens, data model, and grade tables
+> otherwise match this spec.
 
 ## Concept
 
@@ -95,16 +98,42 @@ Seed collection ships with 4 comics (e.g. *The Vanishing Hour* #1, NM 9.4, $480 
 
 ## Visual system
 
-- **Typography**: Inter (body, UI text) and Inter Tight (headings, large numeric values), both loaded in weights 400/500/600 with full Latin/Greek/Cyrillic/Vietnamese coverage.
+> Restyled to follow the [Relate design system](https://styles.refero.design/style/337ade6a-4bae-49ba-b4aa-8994ac805a81)
+> — "cool dawn over product canvas": clean, minimal, confident-through-restraint, a single
+> saturated brand blue carrying the whole identity. **Not yet applied to the live app's CSS** —
+> this section documents the target palette/type/shape system for the next styling pass; the
+> screens and interaction notes elsewhere in this doc are unaffected.
+
+- **Typography**: Inter (400/500/600) for everything — body, UI labels, and headings (no separate
+  display face). Fallback stack: DM Sans, Geist, Manrope. Monospace (numeric tables, IDs): Roboto
+  Mono (500/700). Scale: Display 80px/600, Heading Large 56px/600, Heading 40px/600 (all
+  line-height 1.05, tight negative letter-spacing), Body 16px/400 (line-height 1.63), Body Small
+  14px/400 (line-height 1.43) — never smaller than 14px, never lighter than Ash Helper below.
 - **Palette**:
-  - Background: `#f0eee9` (app canvas) / `#fafaf9` (screen surfaces)
-  - Ink: `#0c0a09` (primary text), `#78716c` (secondary text), `#a8a29e` (tertiary/labels), `#d6d3d1` (placeholder glyphs)
-  - Borders/dividers: `#e8e6e5`
-  - Accent (brand blue): `#3ba6f1` fill / `#3398e1` hover & border / `#c1e1f7` tint background
-  - Dark surfaces (camera, active tab pill): `#1c1917`
-- **Shape language**: 6–10px radii for inputs and cards, fully rounded (`9999px`) pills for buttons and the tab switcher, thin 1px borders in the neutral border color.
-- **Motion**: a vertical sweep animation on the scan line (`vsweep`, 2.4s ease-in-out alternate) and a soft opacity pulse (`vpulse`, ~1–2s) used for the scan hint text and the busy-state placeholder cover.
-- **Placeholder covers**: diagonal hatched gradient stand-in for real photography, with the item's initials overlaid — called out explicitly as a stand-in for the captured photo in production.
+  - Canvas/background: `#fcfcfc` (Snow Canvas) — page background and cards
+  - Secondary surfaces: `#f0f4fe` (Lavender Wash, hero/feature sections), `#f1f5f9` (Fog Surface,
+    inputs and disabled states)
+  - Ink: `#020520` (Midnight Ink, headings), `#14141e` (Graphite Body, body/UI text),
+    `#374151` (Slate Caption, secondary copy), `#6b7280` (Ash Helper, tertiary/faint)
+  - Borders/dividers: `#e2e8f0` (Stone Divider)
+  - Accent (the *only* saturated brand color — never mix in a second): `#145aff` (Royal Signal)
+    for headlines, links, and active states; `#3b82f6` (Cobalt Glow) for soft hover/background
+    emphasis; `#0099ff` (Azure Focus) for input focus rings
+  - Status accents (tags/indicators only, not brand identity): `#16ca2e` (Mint Win, success),
+    `#f26052` (Coral Lost, error), `#ffa64d` (Amber Pending, pending)
+- **Shape language**: two-tier rounding — 8px for cards/tags, 12px for inputs, 16–40px for outer
+  containers/feature panels; buttons and pills are fully rounded (`9999px`). No sharp 90° corners
+  on visible elements. Borders thin (1px) in Stone Divider.
+- **Shadows**: small ambient shadow `rgba(0,0,0,0.1) 0px 0px 4px -2px` for resting cards; a soft
+  blue glow `rgba(20,90,255,0.1) 0px 0px 100px -28px` for elevated/focused elements; multi-layer
+  three-shadow stacks for floating feature cards.
+- **Density**: compact — prefer 8–12px gaps between related elements over airy spacing; card
+  padding ~12px. (The page-level section padding and 1200px max-width from the source system are
+  desktop-marketing conventions and don't apply to this app's mobile-first `max-w-md` shell.)
+- **Do**: pill radius on every interactive element; ghost-outlined or frosted pills for CTAs,
+  never heavy filled blocks; 4–6px color-coded status dots.
+- **Don't**: introduce a second saturated brand hue; use browser-default link blue (`#0000ee`);
+  stack multiple saturated colors in one component; use Inter outside 400/500/600.
 
 ## Interaction notes
 

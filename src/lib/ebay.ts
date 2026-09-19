@@ -40,6 +40,12 @@ async function getAccessToken(): Promise<string> {
   return cachedToken.value;
 }
 
+export interface EbayListing {
+  title: string;
+  price: number;
+  imageUrl?: string;
+}
+
 export interface EbayPriceRange {
   low: number;
   median: number;
@@ -47,8 +53,15 @@ export interface EbayPriceRange {
   count: number;
   gradedCount: number;
   ungradedCount: number;
+  gradedLow: number | null;
   gradedMedian: number | null;
+  gradedHigh: number | null;
+  ungradedLow: number | null;
   ungradedMedian: number | null;
+  ungradedHigh: number | null;
+  // Every ungraded listing behind the numbers above, so the collector can
+  // sanity-check what's driving the estimate.
+  ungradedListings: EbayListing[];
 }
 
 // Third-party grading services whose name shows up in a listing title when
@@ -89,21 +102,32 @@ export async function searchEbayPriceRange(query: string): Promise<EbayPriceRang
   }
 
   const data = await res.json();
-  const items: { price?: { value?: string; currency?: string }; title?: string }[] =
-    data.itemSummaries ?? [];
+  const items: {
+    price?: { value?: string; currency?: string };
+    title?: string;
+    image?: { imageUrl?: string };
+  }[] = data.itemSummaries ?? [];
 
   const priced = items
     .map((item) => ({
+      title: item.title ?? "",
       price: item.price?.currency === "USD" ? Number(item.price.value) : null,
       graded: isGradedTitle(item.title ?? ""),
+      imageUrl: item.image?.imageUrl,
     }))
-    .filter((item): item is { price: number; graded: boolean } => item.price != null && !Number.isNaN(item.price));
+    .filter(
+      (
+        item
+      ): item is { title: string; price: number; graded: boolean; imageUrl: string | undefined } =>
+        item.price != null && !Number.isNaN(item.price)
+    );
 
   if (priced.length === 0) return null;
 
   const prices = priced.map((p) => p.price).sort((a, b) => a - b);
   const gradedPrices = priced.filter((p) => p.graded).map((p) => p.price).sort((a, b) => a - b);
-  const ungradedPrices = priced.filter((p) => !p.graded).map((p) => p.price).sort((a, b) => a - b);
+  const ungraded = priced.filter((p) => !p.graded).sort((a, b) => a.price - b.price);
+  const ungradedPrices = ungraded.map((p) => p.price);
 
   return {
     low: prices[0],
@@ -112,7 +136,16 @@ export async function searchEbayPriceRange(query: string): Promise<EbayPriceRang
     count: prices.length,
     gradedCount: gradedPrices.length,
     ungradedCount: ungradedPrices.length,
+    gradedLow: gradedPrices[0] ?? null,
     gradedMedian: median(gradedPrices),
+    gradedHigh: gradedPrices[gradedPrices.length - 1] ?? null,
+    ungradedLow: ungradedPrices[0] ?? null,
     ungradedMedian: median(ungradedPrices),
+    ungradedHigh: ungradedPrices[ungradedPrices.length - 1] ?? null,
+    // All ungraded listings found (eBay caps the underlying search at 50
+    // total, graded + ungraded), highest price first.
+    ungradedListings: [...ungraded]
+      .reverse()
+      .map((p) => ({ title: p.title, price: p.price, imageUrl: p.imageUrl })),
   };
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   ItemFormData,
   ItemCategory,
@@ -14,6 +15,8 @@ import {
   defaultGradeKey,
 } from "@/types";
 import { createItem, updateItem, getItems } from "@/lib/items";
+import type { EbayListing } from "@/lib/ebay";
+import Modal from "@/components/Modal";
 
 interface ItemFormProps {
   ownerId: string;
@@ -37,15 +40,22 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
     Boolean(initialData?.purchasePrice)
   );
   const [sourceOptions, setSourceOptions] = useState<string[]>([]);
+  const [rarityOptions, setRarityOptions] = useState<string[]>([]);
   const [estimating, setEstimating] = useState(false);
   const [estimateError, setEstimateError] = useState("");
+  // Raw listing sample from the last eBay check — shown for transparency so
+  // you can see what's driving the numbers, not persisted with the item.
+  const [ungradedListings, setUngradedListings] = useState<EbayListing[]>([]);
+  const [showListingsModal, setShowListingsModal] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     getItems(ownerId, form.category).then((items) => {
       if (cancelled) return;
-      const unique = Array.from(new Set(items.map((i) => i.source).filter(Boolean))).sort();
-      setSourceOptions(unique);
+      setSourceOptions(Array.from(new Set(items.map((i) => i.source).filter(Boolean))).sort());
+      setRarityOptions(
+        Array.from(new Set(items.map((i) => i.rarity).filter((r): r is string => Boolean(r)))).sort()
+      );
     });
     return () => {
       cancelled = true;
@@ -92,11 +102,16 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
         marketListingCount: data.count,
         marketGradedCount: data.gradedCount,
         marketUngradedCount: data.ungradedCount,
+        marketGradedLow: data.gradedLow ?? undefined,
         marketGradedMedian: data.gradedMedian ?? undefined,
+        marketGradedHigh: data.gradedHigh ?? undefined,
+        marketUngradedLow: data.ungradedLow ?? undefined,
         marketUngradedMedian: data.ungradedMedian ?? undefined,
+        marketUngradedHigh: data.ungradedHigh ?? undefined,
         marketCheckedAt: Date.now(),
         value: valueTouched ? prev.value : data.median,
       }));
+      setUngradedListings(data.ungradedListings ?? []);
     } catch {
       setEstimateError("Could not fetch an eBay estimate.");
     } finally {
@@ -140,6 +155,7 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
     : null;
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-8 max-w-xl">
       <Section title="Type">
         <div className="flex flex-wrap gap-2">
@@ -232,6 +248,137 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
         </div>
       </Section>
 
+      {form.category === "trading_card" && (
+        <Section title="Card details">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Serial number">
+              <input
+                value={form.serialNumber ?? ""}
+                onChange={(e) => set("serialNumber", e.target.value)}
+                className={input()}
+                placeholder="e.g. 05/25"
+              />
+            </Field>
+            <Field label="Rarity">
+              <input
+                list="rarity-options"
+                value={form.rarity ?? ""}
+                onChange={(e) => set("rarity", e.target.value)}
+                className={input()}
+                placeholder="e.g. Secret Rare"
+                autoComplete="off"
+              />
+              <datalist id="rarity-options">
+                {rarityOptions.map((r) => (
+                  <option key={r} value={r} />
+                ))}
+              </datalist>
+            </Field>
+          </div>
+          <div className="flex gap-6">
+            <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.isPromo ?? false}
+                onChange={(e) => set("isPromo", e.target.checked)}
+                className="accent-accent"
+              />
+              Promo card
+            </label>
+            <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.isError ?? false}
+                onChange={(e) => set("isError", e.target.checked)}
+                className="accent-accent"
+              />
+              Error / misprint
+            </label>
+          </div>
+        </Section>
+      )}
+
+      {form.category === "lego" && (
+        <Section title="Set details">
+          <Field label="Minifigures included">
+            <input
+              type="number"
+              min={0}
+              step="1"
+              value={form.minifigCount ?? ""}
+              onChange={(e) =>
+                set("minifigCount", e.target.value ? Number(e.target.value) : undefined)
+              }
+              className={input()}
+              placeholder="e.g. 4"
+            />
+          </Field>
+          <div className="flex gap-6">
+            <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.hasInstructions ?? false}
+                onChange={(e) => set("hasInstructions", e.target.checked)}
+                className="accent-accent"
+              />
+              Instructions included
+            </label>
+            <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.isRetired ?? false}
+                onChange={(e) => set("isRetired", e.target.checked)}
+                className="accent-accent"
+              />
+              Retired / EOL
+            </label>
+          </div>
+        </Section>
+      )}
+
+      {form.category === "video_game" && (
+        <Section title="Game details">
+          <Field label="Region">
+            <input
+              list="region-options"
+              value={form.region ?? ""}
+              onChange={(e) => set("region", e.target.value)}
+              className={input()}
+              placeholder="e.g. NTSC-U"
+              autoComplete="off"
+            />
+            <datalist id="region-options">
+              <option value="NTSC-U" />
+              <option value="PAL" />
+              <option value="NTSC-J" />
+              <option value="Region-Free" />
+            </datalist>
+          </Field>
+          <div className="flex gap-6">
+            <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.isReprint ?? false}
+                onChange={(e) => set("isReprint", e.target.checked)}
+                className="accent-accent"
+              />
+              Reprint (Player&apos;s Choice / Greatest Hits)
+            </label>
+          </div>
+          <div className="flex gap-6">
+            <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.isNotForResale ?? false}
+                onChange={(e) => set("isNotForResale", e.target.checked)}
+                className="accent-accent"
+              />
+              Not for Resale / demo
+            </label>
+          </div>
+        </Section>
+      )}
+
       <Section title="Condition">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {grades.map((g) => (
@@ -315,6 +462,17 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
               <p className="text-xs text-ink-faint">Not checked yet.</p>
             )}
           </div>
+
+
+          {ungradedListings.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowListingsModal(true)}
+              className="text-sm text-accent hover:text-accent-hover"
+            >
+              See listings ({ungradedListings.length})
+            </button>
+          )}
 
           <div className="flex items-end gap-3">
             <Field label="Your value">
@@ -415,6 +573,36 @@ export default function ItemForm({ ownerId, itemId, initialData, defaultCategory
         </button>
       </div>
     </form>
+
+    <Modal
+      open={showListingsModal}
+      onClose={() => setShowListingsModal(false)}
+      title={`Ungraded listings (${ungradedListings.length})`}
+    >
+      <div className="space-y-1.5">
+        {ungradedListings.map((listing, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-3 bg-canvas border border-border rounded-lg px-3 py-2"
+          >
+            <div className="w-[80px] h-[80px] shrink-0 rounded overflow-hidden bg-surface border border-border relative">
+              {listing.imageUrl && (
+                <Image
+                  src={listing.imageUrl}
+                  alt={listing.title}
+                  fill
+                  sizes="80px"
+                  className="object-cover"
+                />
+              )}
+            </div>
+            <p className="text-xs text-ink-muted flex-1">{listing.title}</p>
+            <p className="text-xs font-medium text-ink shrink-0">{formatCurrency(listing.price)}</p>
+          </div>
+        ))}
+      </div>
+    </Modal>
+    </>
   );
 }
 

@@ -60,6 +60,18 @@ export default function ValuePage() {
     .sort((a, b) => Math.abs(b.value - b.market) - Math.abs(a.value - a.market))
     .slice(0, 10);
 
+  const comicsByPublisher = Object.values(
+    items
+      .filter((i) => i.category === "comic")
+      .reduce<Record<string, { publisher: string; count: number; value: number }>>((acc, item) => {
+        const publisher = item.source.trim() || "Unknown";
+        if (!acc[publisher]) acc[publisher] = { publisher, count: 0, value: 0 };
+        acc[publisher].count += item.quantity;
+        acc[publisher].value += itemTotalValue(item);
+        return acc;
+      }, {})
+  ).sort((a, b) => b.value - a.value);
+
   return (
     <div>
       <h1 className="text-xl font-display font-semibold text-ink mb-5">Value</h1>
@@ -131,6 +143,30 @@ export default function ValuePage() {
           );
         })}
       </div>
+
+      {comicsByPublisher.length > 0 && (
+        <>
+          <h2 className="text-sm font-medium text-ink-muted mb-2">Comics by publisher</h2>
+          <div className="space-y-2 mb-6">
+            {comicsByPublisher.map((group) => (
+              <div
+                key={group.publisher}
+                className="flex items-center justify-between bg-surface border border-border rounded-lg px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm text-ink truncate">{group.publisher}</p>
+                  <p className="text-xs text-ink-faint">
+                    {group.count} item{group.count === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <p className="text-sm font-display font-semibold text-ink shrink-0">
+                  {formatCurrency(group.value)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {biggestGaps.length > 0 && (
         <>

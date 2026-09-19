@@ -91,6 +91,7 @@ export const VIDEO_GAME_GRADES: GradeOption[] = [
   { key: "sealed", label: "Sealed", note: "Factory sealed", multiplier: 1.0 },
   { key: "cib", label: "CIB", note: "Complete in box", multiplier: 0.55 },
   { key: "loose", label: "Loose", note: "Cart/disc only", multiplier: 0.3 },
+  { key: "box_manual", label: "Box & Manual Only", note: "No cartridge/disc", multiplier: 0.12 },
   { key: "digital", label: "Digital", note: "Digital copy", multiplier: 0.15 },
 ];
 
@@ -139,6 +140,19 @@ export interface Item {
   variant?: string;
   year?: number;
   coverPrice?: number;
+  // Trading-card-specific value drivers.
+  serialNumber?: string;
+  rarity?: string;
+  isPromo?: boolean;
+  isError?: boolean;
+  // Lego-specific value drivers.
+  minifigCount?: number;
+  hasInstructions?: boolean;
+  isRetired?: boolean;
+  // Video-game-specific value drivers.
+  region?: string;
+  isReprint?: boolean;
+  isNotForResale?: boolean;
   gradeKey: string;
   market: number;
   marketLow?: number;
@@ -146,8 +160,12 @@ export interface Item {
   marketListingCount?: number;
   marketGradedCount?: number;
   marketUngradedCount?: number;
+  marketGradedLow?: number;
   marketGradedMedian?: number;
+  marketGradedHigh?: number;
+  marketUngradedLow?: number;
   marketUngradedMedian?: number;
+  marketUngradedHigh?: number;
   marketCheckedAt?: number;
   quantity: number;
   purchasePrice?: number;
@@ -186,6 +204,16 @@ export function toFormData(item: Item): ItemFormData {
     variant: item.variant,
     year: item.year,
     coverPrice: item.coverPrice,
+    serialNumber: item.serialNumber,
+    rarity: item.rarity,
+    isPromo: item.isPromo,
+    isError: item.isError,
+    minifigCount: item.minifigCount,
+    hasInstructions: item.hasInstructions,
+    isRetired: item.isRetired,
+    region: item.region,
+    isReprint: item.isReprint,
+    isNotForResale: item.isNotForResale,
     gradeKey: item.gradeKey,
     market: item.market,
     marketLow: item.marketLow,
@@ -193,8 +221,12 @@ export function toFormData(item: Item): ItemFormData {
     marketListingCount: item.marketListingCount,
     marketGradedCount: item.marketGradedCount,
     marketUngradedCount: item.marketUngradedCount,
+    marketGradedLow: item.marketGradedLow,
     marketGradedMedian: item.marketGradedMedian,
+    marketGradedHigh: item.marketGradedHigh,
+    marketUngradedLow: item.marketUngradedLow,
     marketUngradedMedian: item.marketUngradedMedian,
+    marketUngradedHigh: item.marketUngradedHigh,
     marketCheckedAt: item.marketCheckedAt,
     quantity: item.quantity,
     purchasePrice: item.purchasePrice,
